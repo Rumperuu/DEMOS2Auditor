@@ -16,9 +16,8 @@ class BallotVerifyActivity : AppCompatActivity() {
         val extras = intent.extras
         if (extras != null) {
             val ballotHandle = extras.getString("ballotHandle")
-            val myWebView: WebView = findViewById(R.id.webview)
-            // myWebView.loadUrl("http://127.0.0.1:8000/event/audit?handle=$ballotHandle")
-            myWebView.loadUrl("https://en.wikipedia.org/")
+            val myWebView: WebView = findViewById<WebView>(R.id.webview)
+            myWebView.loadUrl("http://elections.lancaster.ac.uk:8000/event/audit?handle=$ballotHandle")
             myWebView.settings.javaScriptEnabled = true
         }
 
