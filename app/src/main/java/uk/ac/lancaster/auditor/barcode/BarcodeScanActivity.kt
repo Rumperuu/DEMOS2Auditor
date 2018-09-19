@@ -1,6 +1,7 @@
 package uk.ac.lancaster.auditor.barcode
 
 import android.content.Intent
+import android.content.Context
 import android.os.Bundle
 import android.os.Environment
 import android.support.v7.app.AppCompatActivity
@@ -9,7 +10,7 @@ import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import java.io.File
-import java.io.FileWriter
+import java.io.FileOutputStream
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.vision.barcode.Barcode
 import uk.ac.lancaster.auditor.BallotVerifyActivity
@@ -19,6 +20,18 @@ import uk.ac.lancaster.auditor.R
 class BarcodeScanActivity : AppCompatActivity() {
 
     private lateinit var mResultTextView: TextView
+    private var stage = 0
+
+    data class Record(val recordID: Int) {
+        var voterID: String = ""
+        var eventID: String = ""
+        var pollID: String = ""
+        var hashes: String = ""
+        var handle: String = ""
+        var hmac: String = ""
+    }
+
+    private val record = Record(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,50 +51,32 @@ class BarcodeScanActivity : AppCompatActivity() {
                 if (data != null) {
                     val barcode = data.getParcelableExtra<Barcode>(BarcodeCaptureActivity.BarcodeObject)
                     mResultTextView.text = barcode.displayValue
-                    val handle = barcode.displayValue.split(";")[0]
-                    val hmac = String(Base64.decode(barcode.displayValue.split(";")[1], Base64.DEFAULT))
 
-                    // save the ballot
-                    if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
-                        val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "ballots")
-                        if (!dir?.mkdirs()) {
-                            Log.e(LOG_TAG, "Directory not created")
+                    // Store the relevant info from whatever this QR code is for
+                    when (stage) {
+                        // Stage 0 is getting the voter ID, poll ID and event ID
+                        0 -> {
+                            val barcodeVal = barcode.displayValue.split(";")
+                            record.voterID = barcodeVal[0]
+                            record.eventID = barcodeVal[1]
+                            record.pollID = barcodeVal[2]
                         }
-
-                        val ballotFile = File(dir, "$handle.ballot")
-                        if (ballotFile.exists()) {
-                            ballotFile.delete()
+                        // Stage 1 is getting the hashes of both ballots
+                        1 -> {
+                            record.hashes = barcode.displayValue
                         }
-
-                        try {
-                            val out = FileWriter(ballotFile)
-                            out.write(handle)
-                            out.flush()
-                            out.close()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                        // Stage 2 is getting the handle of the unselected ballot on the server
+                        2 -> {
+                            record.handle = barcode.displayValue.split(";")[0]
+                            record.hmac = String(Base64.decode(barcode.displayValue.split(";")[1], Base64.DEFAULT))
+                            saveRecord()
+                            finish()
                         }
-
-                        val hmacFile = File(dir, "$handle.hmac")
-                        if (hmacFile.exists()) {
-                            hmacFile.delete()
+                        else -> {
+                            //something's gone wrong if this gets called
                         }
-
-                        try {
-                            val out = FileWriter(hmacFile)
-                            out.write(hmac)
-                            out.flush()
-                            out.close()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-
                     }
-
-                    //if some test of the QR = ballot handle
-                    val intent = Intent(baseContext, BallotVerifyActivity::class.java)
-                    intent.putExtra("ballotHandle", handle)
-                    startActivity(intent)
+                    stage++
                 } else
                     mResultTextView.setText(R.string.no_barcode_captured)
             } else
@@ -89,6 +84,22 @@ class BarcodeScanActivity : AppCompatActivity() {
                         CommonStatusCodes.getStatusCodeString(resultCode)))
         } else
             super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    private fun saveRecord() {
+        // save the ballot
+        val filename = record.handle
+        val fileContents = record.toString()
+        val outputStream: FileOutputStream
+
+        try {
+            outputStream = openFileOutput(filename, Context.MODE_PRIVATE)
+            outputStream.write(fileContents.toByteArray())
+            outputStream.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
     }
 
     companion object {

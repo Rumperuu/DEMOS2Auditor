@@ -11,8 +11,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        findViewById<Button>(R.id.scan_ballot_qr).setOnClickListener {
+        findViewById<Button>(R.id.cast_vote).setOnClickListener {
             val intent = Intent(applicationContext, BarcodeScanActivity::class.java)
+            startActivity(intent)
+        }
+        findViewById<Button>(R.id.audit_election).setOnClickListener {
+            val intent = Intent(applicationContext, AuditActivity::class.java)
             startActivity(intent)
         }
     }
